@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const port = 3042;
+const {secp256k1} = require("ethereum-cryptography/secp256k1");
 
 app.use(cors());
 app.use(express.json());
@@ -19,13 +20,24 @@ app.get("/balance/:address", (req, res) => {
 });
 
 app.post("/send", (req, res) => {
-  const { sender, recipient, amount } = req.body;
-
+  let { sender, recipient, amount, pubKey, signature, msgHash } = req.body;
   setInitialBalance(sender);
   setInitialBalance(recipient);
+  
+  signature = {
+    r: BigInt(signature.r),
+    s: BigInt(signature.s)
+  };
+
+  const isValid = secp256k1.verify(signature, msgHash, pubKey) === true
+  
+  if (!isValid) {
+    res.status(400).send({ message: "Signature invalid" });
+    return
+  }
 
   if (balances[sender] < amount) {
-    res.status(400).send({ message: "Not enough funds!" });
+    res.status(400).send({ message: "Not enough funds" });
   } else {
     balances[sender] -= amount;
     balances[recipient] += amount;
